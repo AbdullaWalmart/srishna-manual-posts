@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: srishna-manual-posts
+  datasource:
+    # Use SQLITE_PATH for Cloud Run (e.g. /tmp/srishna.db); default ./data for local
+    url: jdbc:sqlite:${SQLITE_PATH:./data/srishna.db}
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    show-sql: false
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+# GCP: credentials from resources/dev_serviceAccountKey.json (or override with GCP_CREDENTIALS_PATH)
+gcp:
+  project-id: ${GCP_PROJECT_ID:global-repeater-479306-s2}
+  bucket-name: ${GCP_BUCKET:prod_srishna_web}
+  credentials-path: ${GCP_CREDENTIALS_PATH:classpath:dev_serviceAccountKey.json}
+
+# JWT (use a long random secret in production)
+jwt:
+  secret: ${JWT_SECRET:srishna-dev-secret-change-in-production-min-256-bits}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+# Base URL for share links and reset links (no trailing slash)
+app:
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:8080}
+
+server:
+  port: ${PORT:8080}
+  # Spring Boot 3: request header size (avoids "Request header is too large"). Send caption as form field "text", not in URL.
+  max-http-request-header-size: 524288
+  # Cloud Run terminates TLS and forwards protocol via headers.
+  forward-headers-strategy: framework
+
+# Swagger / OpenAPI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
