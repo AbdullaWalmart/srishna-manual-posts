@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ShareVisitRepository extends JpaRepository<ShareVisit, Long> {
 
     long countByShareRecordId(Long shareRecordId);
+
+    void deleteByShareRecordId(Long shareRecordId);
 }

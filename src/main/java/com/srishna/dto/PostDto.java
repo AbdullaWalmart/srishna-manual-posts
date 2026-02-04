@@ -18,6 +18,10 @@ public class PostDto {
     /** Complete storage path in bucket (e.g. images/uuid.jpg). */
     private String imagePath;
     private String textContent;
+    /** If false, post is hidden from list APIs. */
+    private Boolean active;
+    /** Name of the user who uploaded the post (or email if no name). */
+    private String uploaderName;
     /** Uploaded / created datetime (ISO-8601). */
     private Instant createdAt;
 }

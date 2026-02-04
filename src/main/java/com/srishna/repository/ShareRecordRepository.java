@@ -11,4 +11,6 @@ public interface ShareRecordRepository extends JpaRepository<ShareRecord, Long> 
     Optional<ShareRecord> findByShareToken(String shareToken);
 
     List<ShareRecord> findByPostIdOrderByCreatedAtDesc(Long postId);
+
+    void deleteByPostId(Long postId);
 }

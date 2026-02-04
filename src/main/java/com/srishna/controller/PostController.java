@@ -19,7 +19,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -48,12 +47,35 @@ public class PostController {
         return postService.findAllAsList();
     }
 
+    /** Returns all active posts as a list (newest first), no pagination. Same as /list. */
+    @GetMapping("/all")
+    public List<PostDto> listAllActive() {
+        return postService.findAllAsList();
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<PostDto> getById(@PathVariable Long id) {
         return postService.findById(id)
                 .map(postService::toDto)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Set post active/inactive (excluded from list when inactive). */
+    @PatchMapping("/{id}/active")
+    public ResponseEntity<PostDto> setActive(@PathVariable Long id, @RequestParam boolean active) {
+        return postService.setActive(id, active)
+                .map(postService::toDto)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Permanently delete a post. */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        return postService.deleteById(id)
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.notFound().build();
     }
 
     @GetMapping("/{id}/activity")
@@ -66,7 +88,7 @@ public class PostController {
             Authentication auth,
             @RequestParam("image") MultipartFile image,
             @RequestParam(value = "text", required = false) String text) throws IOException {
-        Long userId = auth != null && auth.getPrincipal() instanceof Long ? (Long) auth.getPrincipal() : null;
+        Long userId = getUserIdFromAuth(auth);
         String imagePath = storageService.uploadImage(image);
         String textPath = null;
         String textContent = text;
@@ -75,5 +97,16 @@ public class PostController {
         }
         Post post = postService.create(userId, imagePath, textPath, textContent);
         return ResponseEntity.ok(postService.toDto(post));
+    }
+
+    /** Extract user ID from JWT auth principal (Long or numeric String). */
+    private static Long getUserIdFromAuth(Authentication auth) {
+        if (auth == null || auth.getPrincipal() == null) return null;
+        Object p = auth.getPrincipal();
+        if (p instanceof Long) return (Long) p;
+        if (p instanceof String) {
+            try { return Long.parseLong((String) p); } catch (NumberFormatException ignored) { }
+        }
+        return null;
     }
 }

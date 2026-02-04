@@ -12,4 +12,6 @@ public interface SavedItemRepository extends JpaRepository<SavedItem, Long> {
     List<SavedItem> findByPostIdOrderBySavedAtDesc(Long postId);
 
     boolean existsByPostIdAndUserId(Long postId, Long userId);
+
+    void deleteByPostId(Long postId);
 }

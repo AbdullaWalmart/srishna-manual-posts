@@ -20,6 +20,7 @@ gcp:
   project-id: ${GCP_PROJECT_ID:global-repeater-479306-s2}
   bucket-name: ${GCP_BUCKET:prod_srishna_web}
   credentials-path: ${GCP_CREDENTIALS_PATH:classpath:dev_serviceAccountKey.json}
+  db-object-name: ${GCP_DB_OBJECT:data/srishna.db}
 
 # JWT (use a long random secret in production)
 jwt:
@@ -29,7 +30,9 @@ jwt:
 # Base URL for share links and reset links (no trailing slash)
 app:
   base-url: ${APP_BASE_URL:http://localhost:5173}
-  cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:8080}
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:8080,https://srishna-manual-posts-ui-712085419978.asia-south1.run.app}
+  # Local path for SQLite DB (used for GCS backup/restore). Should match datasource path.
+  db-path: ${SQLITE_PATH:./data/srishna.db}
 
 server:
   port: ${PORT:8080}

@@ -15,6 +15,13 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     List<Post> findAllByOrderByCreatedAtDesc();
 
+    Page<Post> findAllByActiveTrueOrderByCreatedAtDesc(Pageable pageable);
+
+    List<Post> findAllByActiveTrueOrderByCreatedAtDesc();
+
+    @Query("SELECT p FROM Post p WHERE p.active = true AND LOWER(p.textContent) LIKE LOWER(CONCAT('%', :q, '%')) ORDER BY p.createdAt DESC")
+    Page<Post> searchActiveByText(@Param("q") String query, Pageable pageable);
+
     @Query("SELECT p FROM Post p WHERE LOWER(p.textContent) LIKE LOWER(CONCAT('%', :q, '%')) ORDER BY p.createdAt DESC")
     Page<Post> searchByText(@Param("q") String query, Pageable pageable);
 }

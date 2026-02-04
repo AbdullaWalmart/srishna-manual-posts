@@ -1,7 +1,6 @@
 package com.srishna.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
@@ -35,6 +34,11 @@ public class Post {
     /** User who created the post */
     @Column(name = "user_id")
     private Long userId;
+
+    /** If false, post is hidden from list APIs (soft delete / inactive). */
+    @Column(nullable = false, columnDefinition = "INTEGER DEFAULT 1")
+    @Builder.Default
+    private Boolean active = true;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

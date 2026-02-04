@@ -1,12 +1,45 @@
+# Build
 /target/
-!.mvn/wrapper/maven-wrapper.jar
-*.jar
-*.war
 *.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+*.war
+*.ear
+*.nar
+*.zip
+
+# Maven
+pom.xml.tag
+pom.releaseBackup
+pom.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Env and secrets
 .env
 .env.local
 *.credentials.json
 *-service-account*.json
 dev_serviceAccountKey.json
+
+# Local data (DB, uploads)
 /data/

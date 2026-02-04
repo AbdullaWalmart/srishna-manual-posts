@@ -66,13 +66,13 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<AuthDto> me(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<AuthDto> me(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(401).build();
+            return ResponseEntity.ok().build();
         }
         String token = authHeader.substring(7);
         if (!jwtService.validateToken(token)) {
-            return ResponseEntity.status(401).build();
+            return ResponseEntity.ok().build();
         }
         Long userId = jwtService.getUserIdFromToken(token);
         return authService.findById(userId)
@@ -81,6 +81,6 @@ public class AuthController {
                         .email(user.getEmail())
                         .name(user.getName())
                         .build()))
-                .orElse(ResponseEntity.status(401).build());
+                .orElse(ResponseEntity.ok().build());
     }
 }
