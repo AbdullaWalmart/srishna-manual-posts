@@ -66,12 +66,11 @@ The upload API returns the created post with **complete image path**, **text**, 
 
 ---
 
-## Data persistence (GCS)
+## Database (GCS)
 
-The app can keep the SQLite DB in sync with the **prod_srishna_web** bucket so data survives deployment:
+The database lives in the GCS bucket. **On every startup** the app loads `gs://prod_srishna_web/data/srishna.db` (or `GCP_BUCKET` / `GCP_DB_OBJECT`) to a runtime path. No DB file is stored in the project directory: the path defaults to the system temp dir (e.g. `/tmp/srishna.db` on Linux, `%TEMP%\srishna.db` on Windows) unless `SQLITE_PATH` is set.
 
-- **Backup (upload DB to GCS):** `POST /api/admin/backup-db` — uploads the current DB to `gs://<bucket>/data/srishna.db`. Call before deployment or on a schedule.
-- **Revert (download DB from GCS to local):** `POST /api/admin/revert-db` — downloads the DB from the bucket to the local path (e.g. `/tmp/srishna.db`). Use this to restore from the bucket so you do not lose existing data. **Restart the application** after calling so it uses the reverted data.
-- **Restore on startup:** Set env `GCP_DB_RESTORE=true` so the app downloads `data/srishna.db` from the bucket to the local DB path before starting.
+- **Backup (upload DB to GCS):** `POST /api/admin/backup-db` — uploads the current DB to `gs://<bucket>/data/srishna.db`. Call after changes or before redeploy so the bucket has the latest.
+- **Revert (download DB from GCS):** `POST /api/admin/revert-db` — downloads the DB from the bucket to the local path. **Restart the application** after calling to use the reverted data.
 
-Config: `app.db-path`, `gcp.db-object-name` (default `data/srishna.db`), `gcp.bucket-name`.
+Config: `gcp.bucket-name` (default `prod_srishna_web`), `gcp.db-object-name` (default `data/srishna.db`). DB path: `SQLITE_PATH` (defaults to system temp; set e.g. `/tmp/srishna.db` on Cloud Run).

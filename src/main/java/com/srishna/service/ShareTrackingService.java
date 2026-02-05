@@ -19,8 +19,8 @@ public class ShareTrackingService {
 
     private final ShareRecordRepository shareRecordRepository;
     private final ShareVisitRepository shareVisitRepository;
-
     private final ShareMethodLogRepository shareMethodLogRepository;
+    private final DbSyncHelper dbSyncHelper;
 
     /** Create a new share link for a post. parentShareId = null for first share; userId = who shared (if logged in). */
     @Transactional
@@ -32,17 +32,21 @@ public class ShareTrackingService {
                 .userId(userId)
                 .parentShareId(parentShareId)
                 .build();
-        return shareRecordRepository.save(record);
+        record = shareRecordRepository.save(record);
+        dbSyncHelper.syncToGcsAfterCommit();
+        return record;
     }
 
     /** Record that a share was used via a specific app (e.g. whatsapp, twitter). */
     @Transactional
     public void recordShareMethod(String shareToken, String method) {
-        shareRecordRepository.findByShareToken(shareToken).ifPresent(record ->
-                shareMethodLogRepository.save(ShareMethodLog.builder()
-                        .shareRecordId(record.getId())
-                        .method(method != null ? method : "unknown")
-                        .build()));
+        shareRecordRepository.findByShareToken(shareToken).ifPresent(record -> {
+            shareMethodLogRepository.save(ShareMethodLog.builder()
+                    .shareRecordId(record.getId())
+                    .method(method != null ? method : "unknown")
+                    .build());
+            dbSyncHelper.syncToGcsAfterCommit();
+        });
     }
 
     /** Record that someone opened a share link (?ref=TOKEN). Returns postId to show. */
@@ -55,6 +59,7 @@ public class ShareTrackingService {
                 .visitorId(visitorId)
                 .build();
         shareVisitRepository.save(visit);
+        dbSyncHelper.syncToGcsAfterCommit();
         return Optional.of(record.get().getPostId());
     }
 

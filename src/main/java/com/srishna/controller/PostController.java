@@ -53,6 +53,12 @@ public class PostController {
         return postService.findAllAsList();
     }
 
+    /** Returns all posts (active + inactive) for admin list. */
+    @GetMapping("/admin/list")
+    public List<PostDto> listAllForAdmin() {
+        return postService.findAllIncludingInactive();
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<PostDto> getById(@PathVariable Long id) {
         return postService.findById(id)

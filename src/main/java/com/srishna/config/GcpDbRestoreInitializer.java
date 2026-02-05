@@ -15,38 +15,44 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Runs before the DataSource is created. When GCP_DB_RESTORE=true, downloads
- * the SQLite DB from the prod_srishna_web bucket to the local path so deployment
- * uses the same data.
+ * Runs before the DataSource is created. Always downloads the SQLite DB from the GCS bucket
+ * (gs://bucket/data/srishna.db) to the local path so both local and Cloud Run use the same DB.
+ * Source: https://storage.googleapis.com/prod_srishna_web/data/srishna.db
  */
 public class GcpDbRestoreInitializer implements org.springframework.context.ApplicationContextInitializer<org.springframework.context.ConfigurableApplicationContext> {
-
-    private static final String RESTORE_ENV = "GCP_DB_RESTORE";
 
     @Override
     public void initialize(org.springframework.context.ConfigurableApplicationContext context) {
         Environment env = context.getEnvironment();
-        if (!"true".equalsIgnoreCase(env.getProperty(RESTORE_ENV))) {
-            return;
-        }
         String bucketName = env.getProperty("gcp.bucket-name");
-        String dbObjectName = env.getProperty("gcp.db-object-name", "data/srishna.db");
-        String localPath = env.getProperty("SQLITE_PATH", env.getProperty("app.db-path", "./data/srishna.db"));
         if (!StringUtils.hasText(bucketName)) {
             bucketName = System.getenv("GCP_BUCKET");
-            if (!StringUtils.hasText(bucketName)) return;
         }
+        if (!StringUtils.hasText(bucketName)) {
+            return;
+        }
+        String dbObjectName = env.getProperty("gcp.db-object-name", "data/srishna.db");
+        String localPath = env.getProperty("SQLITE_PATH");
+        if (localPath == null || localPath.isEmpty()) {
+            localPath = System.getProperty("java.io.tmpdir") + "/srishna.db";
+        }
+        Path path = Paths.get(localPath).toAbsolutePath().normalize();
         try {
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
             Storage storage = createStorage(env);
-            byte[] bytes = storage.get(BlobId.of(bucketName, dbObjectName)).getContent();
-            if (bytes == null || bytes.length == 0) return;
-            Path path = Paths.get(localPath).toAbsolutePath().normalize();
-            Files.createDirectories(path.getParent());
-            Files.write(path, bytes);
-            System.out.println("[GcpDbRestore] Restored DB from gs://" + bucketName + "/" + dbObjectName + " to " + path);
+            BlobId blobId = BlobId.of(bucketName, dbObjectName);
+            com.google.cloud.storage.Blob blob = storage.get(blobId);
+            if (blob != null && blob.exists()) {
+                byte[] bytes = blob.getContent();
+                if (bytes != null && bytes.length > 0) {
+                    Files.write(path, bytes);
+                }
+            }
+            // If no blob in GCS, SQLite will create DB on first connect; first write will upload to GCS
         } catch (Exception e) {
-            System.err.println("[GcpDbRestore] Restore failed: " + e.getMessage());
-            // Do not fail startup if blob does not exist (first deploy)
+            System.err.println("[GcpDb] Load failed (will use existing local file if present): " + e.getMessage());
         }
     }
 

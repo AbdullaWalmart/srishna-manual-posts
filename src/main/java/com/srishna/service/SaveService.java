@@ -18,6 +18,7 @@ public class SaveService {
     private final SavedItemRepository savedItemRepository;
     private final PostRepository postRepository;
     private final PostService postService;
+    private final DbSyncHelper dbSyncHelper;
 
     @Transactional
     public void save(Long postId, Long userId) {
@@ -27,6 +28,7 @@ public class SaveService {
                 .postId(postId)
                 .userId(userId)
                 .build());
+        dbSyncHelper.syncToGcsAfterCommit();
     }
 
     public List<Post> getMySaves(Long userId) {

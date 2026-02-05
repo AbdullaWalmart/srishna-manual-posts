@@ -41,5 +41,7 @@ Thumbs.db
 *-service-account*.json
 dev_serviceAccountKey.json
 
-# Local data (DB, uploads)
+# Local data (DB, uploads) – DB is in GCS (gs://prod_srishna_web/data/srishna.db), no local file in project
 /data/
+srishna.db
+*.db

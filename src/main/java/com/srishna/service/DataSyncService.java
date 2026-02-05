@@ -14,8 +14,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Syncs the SQLite DB file with the prod_srishna_web bucket so data survives deployment.
- * Backup uploads the current DB to GCS; restore is done at startup via {@link com.srishna.config.GcpDbRestoreInitializer}.
+ * Syncs the SQLite DB file with the GCS bucket (gs://prod_srishna_web/data/srishna.db).
+ * On startup the DB is loaded from GCS via {@link com.srishna.config.GcpDbRestoreInitializer}.
+ * Backup uploads the current DB to GCS.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,12 +31,11 @@ public class DataSyncService {
     @Value("${gcp.db-object-name:data/srishna.db}")
     private String dbObjectName;
 
-    @Value("${app.db-path:./data/srishna.db}")
+    @Value("${app.db-path}")
     private String dbPath;
 
     /**
-     * Uploads the current SQLite DB file to the GCS bucket (e.g. gs://prod_srishna_web/data/srishna.db).
-     * Call this before deployment or periodically so the bucket has the latest data.
+     * Uploads the current SQLite DB file to GCS (gs://bucket/data/srishna.db).
      */
     public void uploadDbToGcs() throws IOException {
         Path path = Paths.get(dbPath).toAbsolutePath().normalize();
@@ -51,20 +51,20 @@ public class DataSyncService {
     }
 
     /**
-     * Downloads the SQLite DB from the GCS bucket to the local path (e.g. /tmp/srishna.db).
-     * Use this to revert to the bucket's data and avoid losing existing data from the bucket.
-     * Restart the application after calling this so it uses the reverted DB.
+     * Downloads the DB from GCS to the local path. Restart the application after calling to use it.
      */
     public void downloadDbFromGcs() throws IOException {
         BlobId blobId = BlobId.of(bucketName, dbObjectName);
         Blob blob = storage.get(blobId);
         if (blob == null || !blob.exists()) {
-            throw new IOException("DB object not found in GCS: gs://" + bucketName + "/" + dbObjectName);
+            throw new IOException("DB not found in GCS: gs://" + bucketName + "/" + dbObjectName);
         }
         byte[] bytes = blob.getContent();
         Path path = Paths.get(dbPath).toAbsolutePath().normalize();
-        Files.createDirectories(path.getParent());
+        if (path.getParent() != null) {
+            Files.createDirectories(path.getParent());
+        }
         Files.write(path, bytes);
-        log.info("Reverted DB from gs://{}/{} to {}", bucketName, dbObjectName, path);
+        log.info("Downloaded DB from gs://{}/{} to {}", bucketName, dbObjectName, path);
     }
 }

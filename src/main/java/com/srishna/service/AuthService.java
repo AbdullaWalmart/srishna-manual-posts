@@ -22,6 +22,7 @@ public class AuthService {
     private final PasswordResetTokenRepository resetTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final DbSyncHelper dbSyncHelper;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -38,7 +39,9 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(password))
                 .name(name != null ? name.trim() : null)
                 .build();
-        return userRepository.save(user);
+        user = userRepository.save(user);
+        dbSyncHelper.syncToGcsAfterCommit();
+        return user;
     }
 
     public Optional<com.srishna.dto.AuthDto> login(String email, String password) {
@@ -83,6 +86,7 @@ public class AuthService {
         userRepository.save(user);
         prt.setUsed(true);
         resetTokenRepository.save(prt);
+        dbSyncHelper.syncToGcsAfterCommit();
         return true;
     }
 

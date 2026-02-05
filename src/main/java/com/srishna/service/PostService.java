@@ -24,6 +24,7 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final DbSyncHelper dbSyncHelper;
     private final SavedItemRepository savedItemRepository;
     private final ShareRecordRepository shareRecordRepository;
     private final ShareVisitRepository shareVisitRepository;
@@ -63,22 +64,26 @@ public class PostService {
                 .textContent(textContent)
                 .active(true)
                 .build();
-        return postRepository.save(post);
+        post = postRepository.save(post);
+        dbSyncHelper.syncToGcsAfterCommit();
+        return post;
     }
 
     @Transactional
     public Optional<Post> setActive(Long id, boolean active) {
-        return postRepository.findById(id)
+        Optional<Post> result = postRepository.findById(id)
                 .map(p -> {
                     p.setActive(active);
                     return postRepository.save(p);
                 });
+        result.ifPresent(p -> dbSyncHelper.syncToGcsAfterCommit());
+        return result;
     }
 
     /** Permanently delete a post and its related saved items, share records, and share visits. */
     @Transactional
     public boolean deleteById(Long id) {
-        return postRepository.findById(id)
+        boolean deleted = postRepository.findById(id)
                 .map(post -> {
                     for (ShareRecord record : shareRecordRepository.findByPostIdOrderByCreatedAtDesc(id)) {
                         shareVisitRepository.deleteByShareRecordId(record.getId());
@@ -89,6 +94,8 @@ public class PostService {
                     return true;
                 })
                 .orElse(false);
+        if (deleted) dbSyncHelper.syncToGcsAfterCommit();
+        return deleted;
     }
 
     public PostDto toDto(Post post) {
