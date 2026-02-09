@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -36,27 +38,35 @@ public class PostController {
             @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size) {
         PageRequest pr = PageRequest.of(page, size);
         if (q != null && !q.isBlank()) {
-            return postService.search(q, pr).map(postService::toDto);
+            return postService.searchDtos(q, pr);
         }
-        return postService.findAll(pr).map(postService::toDto);
+        return postService.findAllDtos(pr);
     }
+
+    private static final CacheControl LIST_CACHE = CacheControl.maxAge(60, TimeUnit.SECONDS);
 
     /** Returns all posts as a list (newest first), no pagination. */
     @GetMapping("/list")
-    public List<PostDto> listAll() {
-        return postService.findAllAsList();
+    public ResponseEntity<List<PostDto>> listAll() {
+        return ResponseEntity.ok()
+                .cacheControl(LIST_CACHE)
+                .body(postService.findAllAsList());
     }
 
     /** Returns all active posts as a list (newest first), no pagination. Same as /list. */
     @GetMapping("/all")
-    public List<PostDto> listAllActive() {
-        return postService.findAllAsList();
+    public ResponseEntity<List<PostDto>> listAllActive() {
+        return ResponseEntity.ok()
+                .cacheControl(LIST_CACHE)
+                .body(postService.findAllAsList());
     }
 
     /** Returns all posts (active + inactive) for admin list. */
     @GetMapping("/admin/list")
-    public List<PostDto> listAllForAdmin() {
-        return postService.findAllIncludingInactive();
+    public ResponseEntity<List<PostDto>> listAllForAdmin() {
+        return ResponseEntity.ok()
+                .cacheControl(LIST_CACHE)
+                .body(postService.findAllIncludingInactive());
     }
 
     @GetMapping("/{id}")

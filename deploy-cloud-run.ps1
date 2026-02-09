@@ -12,4 +12,4 @@ gcloud run deploy srishna-image-upload `
   --memory 2Gi `
   --cpu 2 `
   --timeout 3000 `
-  --set-env-vars "SQLITE_PATH=/tmp/srishna.db,GCP_BUCKET=prod_srishna_web"
+  --set-env-vars "SQLITE_PATH=/tmp/srishna.db,GCP_BUCKET=prod_srishna_web,APP_BASE_URL=https://srishna-image-upload-712085419978.asia-south1.run.app,APP_BACKEND_URL=https://srishna-image-upload-712085419978.asia-south1.run.app"

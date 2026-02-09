@@ -1,5 +1,6 @@
 package com.srishna.service;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.HttpMethod;
@@ -12,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
@@ -21,13 +23,26 @@ import java.util.UUID;
 @Slf4j
 public class StorageService {
 
+    private static final String IMAGES_PREFIX = "images/";
+    private static final String TEXTS_PREFIX = "texts/";
+    private static final String GCS_PUBLIC_BASE = "https://storage.googleapis.com/";
+
     private final Storage storage;
 
     @Value("${gcp.bucket-name}")
     private String bucketName;
 
-    private static final String IMAGES_PREFIX = "images/";
-    private static final String TEXTS_PREFIX = "texts/";
+    @Value("${gcp.public-urls:false}")
+    private boolean publicUrls;
+
+    /** Cache signed URLs by object path so browser can cache image response; long validity = load without re-signing. */
+    private static final int SIGNED_URL_VALIDITY_HOURS = 24;
+    private static final int SIGNED_URL_CACHE_MINUTES = 23 * 60; // just under validity
+
+    private final com.github.benmanes.caffeine.cache.Cache<String, String> signedUrlCache = Caffeine.newBuilder()
+            .maximumSize(2000)
+            .expireAfterWrite(SIGNED_URL_CACHE_MINUTES, TimeUnit.MINUTES)
+            .build();
 
     /** Upload image to bucket/images/{uuid}.{ext} */
     public String uploadImage(MultipartFile file) throws IOException {
@@ -52,21 +67,31 @@ public class StorageService {
         return name;
     }
 
-    /** Returns a signed URL valid for 1 hour so the frontend can load the image from a private bucket. */
+    /** Returns a signed URL valid 24h; cached so same URL is reused and browser can cache the image (loads live, no buffer). */
     public String getSignedUrl(String objectPath) {
         if (objectPath == null || objectPath.isEmpty()) return null;
+        String cached = signedUrlCache.getIfPresent(objectPath);
+        if (cached != null) return cached;
         try {
             BlobInfo info = BlobInfo.newBuilder(BlobId.of(bucketName, objectPath)).build();
-            URL signed = storage.signUrl(info, 1, TimeUnit.HOURS, Storage.SignUrlOption.httpMethod(HttpMethod.GET));
-            return signed.toString();
+            URL signed = storage.signUrl(info, SIGNED_URL_VALIDITY_HOURS, TimeUnit.HOURS, Storage.SignUrlOption.httpMethod(HttpMethod.GET));
+            String url = signed != null ? signed.toString() : null;
+            if (url != null) signedUrlCache.put(objectPath, url);
+            return url;
         } catch (Exception e) {
             log.warn("Failed to sign URL for {}: {}", objectPath, e.getMessage());
             return null;
         }
     }
 
-    /** Returns URL for the object (signed URL for private buckets). */
+    /** Returns URL for the object: public GCS URL if gcp.public-urls=true, else cached signed URL. */
     public String getPublicUrl(String objectPath) {
+        if (objectPath == null || objectPath.isEmpty()) return null;
+        if (publicUrls) {
+            // Encode path but keep slashes so URL is https://storage.googleapis.com/bucket/images/name.jpg
+            String encoded = URLEncoder.encode(objectPath, StandardCharsets.UTF_8).replace("+", "%20").replace("%2F", "/");
+            return GCS_PUBLIC_BASE + bucketName + "/" + encoded;
+        }
         return getSignedUrl(objectPath);
     }
 

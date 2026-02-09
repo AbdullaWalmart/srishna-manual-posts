@@ -9,13 +9,15 @@ import com.srishna.repository.ShareRecordRepository;
 import com.srishna.repository.ShareVisitRepository;
 import com.srishna.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,16 +36,45 @@ public class PostService {
         return postRepository.findAllByActiveTrueOrderByCreatedAtDesc(pageable);
     }
 
+    /** Paginated list as DTOs with batched user lookup (no N+1). */
+    public Page<PostDto> findAllDtos(Pageable pageable) {
+        Page<Post> page = postRepository.findAllByActiveTrueOrderByCreatedAtDesc(pageable);
+        List<PostDto> dtos = toDtoList(page.getContent());
+        return new PageImpl<>(dtos, page.getPageable(), page.getTotalElements());
+    }
+
+    /** Search results as DTOs with batched user lookup (no N+1). */
+    public Page<PostDto> searchDtos(String query, Pageable pageable) {
+        Page<Post> page = search(query, pageable);
+        List<PostDto> dtos = toDtoList(page.getContent());
+        return new PageImpl<>(dtos, page.getPageable(), page.getTotalElements());
+    }
+
     public List<PostDto> findAllAsList() {
-        return postRepository.findAllByActiveTrueOrderByCreatedAtDesc().stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+        List<Post> posts = postRepository.findAllByActiveTrueOrderByCreatedAtDesc();
+        return toDtoList(posts);
     }
 
     /** All posts (active + inactive) for admin table. */
     public List<PostDto> findAllIncludingInactive() {
-        return postRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(this::toDto)
+        List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
+        return toDtoList(posts);
+    }
+
+    /** Convert post list to DTOs with one batched user lookup to avoid N+1. */
+    private List<PostDto> toDtoList(List<Post> posts) {
+        if (posts.isEmpty()) return List.of();
+        Set<Long> userIds = new HashSet<>();
+        for (Post p : posts) {
+            if (p.getUserId() != null) userIds.add(p.getUserId());
+        }
+        Map<Long, String> uploaderNames = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            userRepository.findAllById(userIds).forEach(u ->
+                    uploaderNames.put(u.getId(), (u.getName() != null && !u.getName().isBlank()) ? u.getName() : u.getEmail()));
+        }
+        return posts.stream()
+                .map(p -> toDto(p, uploaderNames.get(p.getUserId())))
                 .collect(Collectors.toList());
     }
 
@@ -56,6 +87,7 @@ public class PostService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "postLists", allEntries = true)
     public Post create(Long userId, String imagePath, String textPath, String textContent) {
         Post post = Post.builder()
                 .userId(userId)
@@ -70,6 +102,7 @@ public class PostService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "postLists", allEntries = true)
     public Optional<Post> setActive(Long id, boolean active) {
         Optional<Post> result = postRepository.findById(id)
                 .map(p -> {
@@ -82,6 +115,7 @@ public class PostService {
 
     /** Permanently delete a post and its related saved items, share records, and share visits. */
     @Transactional
+    @CacheEvict(cacheNames = "postLists", allEntries = true)
     public boolean deleteById(Long id) {
         boolean deleted = postRepository.findById(id)
                 .map(post -> {
@@ -99,13 +133,16 @@ public class PostService {
     }
 
     public PostDto toDto(Post post) {
+        String uploaderName = post.getUserId() != null
+                ? userRepository.findById(post.getUserId())
+                        .map(u -> (u.getName() != null && !u.getName().isBlank()) ? u.getName() : u.getEmail())
+                        .orElse(null)
+                : null;
+        return toDto(post, uploaderName);
+    }
+
+    private PostDto toDto(Post post, String uploaderName) {
         String imageUrl = storageService.getPublicUrl(post.getImagePath());
-        String uploaderName = null;
-        if (post.getUserId() != null) {
-            uploaderName = userRepository.findById(post.getUserId())
-                    .map(u -> (u.getName() != null && !u.getName().isBlank()) ? u.getName() : u.getEmail())
-                    .orElse(null);
-        }
         return PostDto.builder()
                 .id(post.getId())
                 .imageUrl(imageUrl)
